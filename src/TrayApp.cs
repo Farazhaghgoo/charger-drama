@@ -90,6 +90,7 @@ namespace ChargerDrama
             timer.Interval = 40;
             timer.Tick += OnTick;
             timer.Start();
+            AppPaths.Trace("started: line=" + line + " percent=" + percent + " voice=" + settings.Voice + " micBusy=" + micBusy);
         }
 
         // ---- main loop (25 times a second) ------------------------------------------------
@@ -251,6 +252,7 @@ namespace ChargerDrama
         private void BeginQuit()
         {
             if (quitting) return;
+            AppPaths.Trace("BeginQuit from:" + Environment.NewLine + Environment.StackTrace);
             quitting = true;
             audio.StopVoice();
             string app;
@@ -261,6 +263,7 @@ namespace ChargerDrama
 
         protected override void ExitThreadCore()
         {
+            AppPaths.Trace("ExitThreadCore from:" + Environment.NewLine + Environment.StackTrace);
             timer.Stop();
             tray.Visible = false;
             tray.Dispose();

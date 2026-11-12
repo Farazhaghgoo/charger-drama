@@ -25,6 +25,16 @@ namespace ChargerDrama
         [STAThread]
         private static int Main(string[] args)
         {
+            string parent = "?";
+            if (AppPaths.TracePath != null)
+            try
+            {
+                using (var q = new System.Management.ManagementObjectSearcher("SELECT ParentProcessId FROM Win32_Process WHERE ProcessId = " + System.Diagnostics.Process.GetCurrentProcess().Id))
+                    foreach (System.Management.ManagementObject o in q.Get())
+                        parent = System.Diagnostics.Process.GetProcessById(Convert.ToInt32(o["ParentProcessId"])).ProcessName;
+            }
+            catch { }
+            AppPaths.Trace("Main start, args: [" + string.Join(" ", args) + "], launched by: " + parent + ", exe: " + Application.ExecutablePath);
             if (Has(args, "--selftest")) return SelfTest.Run(Value(args, "--selftest"));
             if (Has(args, "--make-icon")) { IconMaker.Write(Value(args, "--make-icon")); return 0; }
 
@@ -57,12 +67,14 @@ namespace ChargerDrama
                 if (!mine)
                 {
                     // already running: the shortcut / hotkey means "switch off"
+                    AppPaths.Trace("already running -> " + (onOnly ? "nothing to do" : "asking it to switch off"));
                     if (!onOnly) Instance.SignalQuit();
                     return 0;
                 }
                 try
                 {
                     Application.Run(new TrayApp(Has(args, "--startup"), Has(args, "--welcome")));
+                    AppPaths.Trace("message loop ended normally");
                 }
                 finally
                 {

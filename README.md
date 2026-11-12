@@ -114,6 +114,12 @@ python tools/make_voices.py
 
 Only missing clips are made. Add `--force` to remake all of them. Then rebuild.
 
+## Troubleshooting
+
+- **It switches itself off right after starting:** something pressed **Ctrl + Alt + D** (or double-clicked the shortcut), which means "turn off" while it's running.
+- **See exactly what happens:** create an empty file called `trace.log` next to `ChargerDrama.exe` (in `%LOCALAPPDATA%\ChargerDrama`). Every launch, and why it switches off, gets logged there. Delete the file to stop logging.
+- **Errors** are logged to `%APPDATA%\ChargerDrama\error.log`.
+
 ## Project layout
 
 | Path | What it is |

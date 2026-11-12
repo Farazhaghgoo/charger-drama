@@ -48,6 +48,27 @@ namespace ChargerDrama
             get { return string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(InstalledExe), StringComparison.OrdinalIgnoreCase); }
         }
 
+        // Optional diagnostics: put an (empty) trace.log next to the exe, or set CHARGERDRAMA_TRACE
+        // to a file path, to log every launch and why the app switches off.
+        public static string TracePath
+        {
+            get
+            {
+                var path = Environment.GetEnvironmentVariable("CHARGERDRAMA_TRACE");
+                if (!string.IsNullOrEmpty(path)) return path;
+                path = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "trace.log");
+                return File.Exists(path) ? path : null;
+            }
+        }
+
+        public static void Trace(string message)
+        {
+            var path = TracePath;
+            if (path == null) return;
+            try { File.AppendAllText(path, DateTime.Now.ToString("HH:mm:ss.fff") + "  " + message + Environment.NewLine); }
+            catch { }
+        }
+
         public static void LogError(string where, Exception ex)
         {
             try
