@@ -623,18 +623,32 @@ namespace ChargerDrama
         // A temp file path without spaces (8.3 form if needed), or null if none could be found.
         private static string SpaceFreeTempFile()
         {
+            string name = "cdrec_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".wav";
+            string[] candidates =
+            {
+                Path.GetTempPath(),
+                Environment.GetEnvironmentVariable("PUBLIC"),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            };
+            foreach (string candidate in candidates)
+            {
+                string dir = SpaceFreeFolder(candidate);
+                if (dir != null) return Path.Combine(dir, name);
+            }
+            return null;
+        }
+
+        private static string SpaceFreeFolder(string dir)
+        {
             try
             {
-                string dir = Path.GetTempPath();
-                if (dir.IndexOf(' ') >= 0)
-                {
-                    StringBuilder sb = new StringBuilder(520);
-                    int n = GetShortPathName(dir, sb, sb.Capacity);
-                    if (n <= 0 || n >= sb.Capacity) return null;
-                    dir = sb.ToString();
-                    if (dir.IndexOf(' ') >= 0) return null;
-                }
-                return Path.Combine(dir, "cdrec_" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".wav");
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return null;
+                if (dir.IndexOf(' ') < 0) return dir;
+                StringBuilder sb = new StringBuilder(520);
+                int n = GetShortPathName(dir, sb, sb.Capacity);
+                if (n <= 0 || n >= sb.Capacity) return null;
+                string s = sb.ToString();
+                return s.IndexOf(' ') >= 0 ? null : s;
             }
             catch (Exception) { return null; }
         }
@@ -753,7 +767,8 @@ namespace ChargerDrama
             {
                 if (tmp != null) { try { File.Delete(tmp); } catch (Exception) { } }
                 UpdateEnabledState();
-                ShowMicError(rc);
+                // the microphone worked; it's the saving that failed, so don't show the microphone hint
+                MessageBox.Show(this, "Could not save the recording: " + MciError(rc), Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

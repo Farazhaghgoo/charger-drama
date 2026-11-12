@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -67,6 +68,15 @@ namespace ChargerDrama
             mascot = new Mascot(settings, delegate { return audio.IsTalking; }, OnPoke, menu);
             devices = new DeviceWatcher();
             devices.DeviceChanged += OnDevice;
+            devices.Resumed += delegate
+            {
+                // whatever happened to the charger while asleep is old news, and sleep isn't "waiting on battery"
+                ReadPower(true);
+                if (line != PowerLineStatus.Offline) onBatterySince = null;
+                toggles.Clear();
+                UpdateMascotContext();
+                UpdateTray();
+            };
 
             ReadPower(true);
             CheckPresence();
@@ -118,18 +128,21 @@ namespace ChargerDrama
                 if (now == PowerLineStatus.Offline) onBatterySince = DateTime.UtcNow;
                 return;
             }
+            bool changed = false;
             if (now != PowerLineStatus.Unknown && now != line)
             {
                 var previous = line;
                 line = now;
+                changed = true;
                 if (previous != PowerLineStatus.Unknown) OnChargerChanged(now == PowerLineStatus.Online);
                 else if (now == PowerLineStatus.Offline) onBatterySince = DateTime.UtcNow;
             }
 
-            // battery warnings fire once per discharge, and re-arm after charging above them
+            // battery warnings fire once per discharge, and re-arm after charging above them.
+            // They wait for the current line to finish (e.g. the "nooo" when unplugging at 15%).
             if (percent > 22) fired20 = false;
             if (percent > 7) fired5 = false;
-            if (line == PowerLineStatus.Offline && hasBattery && percent >= 0 && clock.Elapsed.TotalSeconds > 3)
+            if (!changed && !audio.IsTalking && line == PowerLineStatus.Offline && hasBattery && percent >= 0 && clock.Elapsed.TotalSeconds > 3)
             {
                 if (!fired5 && percent <= 5) { fired5 = fired20 = true; React(new[] { "low5", "low20" }, Mood.Dying); }
                 else if (!fired20 && percent <= 20) { fired20 = true; React(new[] { "low20" }, Mood.Weak); }
@@ -265,7 +278,8 @@ namespace ChargerDrama
         {
             string s;
             if (line == PowerLineStatus.Online) s = "Plugged in" + (percent >= 0 && hasBattery ? " - " + percent + "%" : "") + ". Life is good!";
-            else if (!hasBattery || percent < 0) s = "On battery.";
+            else if (!hasBattery) s = "No battery found. Not much drama here...";
+            else if (percent < 0) s = "On battery.";
             else if (percent <= 5) s = "On battery - " + percent + "%... I'm dying here!";
             else if (percent <= 20) s = "On battery - " + percent + "%... getting weak...";
             else s = "On battery - " + percent + "%.";
@@ -415,9 +429,11 @@ namespace ChargerDrama
                 if (r != null && r.AnythingRecorded)
                 {
                     library.Reload();
-                    if (library.Find(r.VoiceName) != null)
+                    // by folder, not by name: a recording called "Mad Scientist" is listed as "Mad Scientist (mine)"
+                    var mine = library.Packs.FirstOrDefault(p => p.IsUser && string.Equals(System.IO.Path.GetFileName(p.Folder), r.VoiceName, StringComparison.OrdinalIgnoreCase));
+                    if (mine != null)
                     {
-                        settings.Voice = r.VoiceName;
+                        settings.Voice = mine.Name;
                         settings.Save();
                         UpdateTray();
                         mascot.Say("Ooh! I'm using YOUR voice now!", 4f);

@@ -25,7 +25,7 @@ $rsp = @(
     '/r:System.Management.dll', '/r:Microsoft.CSharp.dll'
 )
 if (Test-Path "$root\assets\ChargerDrama.ico") { $rsp += "/win32icon:`"$root\assets\ChargerDrama.ico`"" }
-Get-ChildItem "$root\sounds" -Recurse -File | Where-Object { $_.Extension -in '.mp3', '.wav', '.json' } | ForEach-Object {
+Get-ChildItem "$root\sounds" -Recurse -File | Where-Object { $_.Extension -in '.mp3', '.wav', '.m4a', '.wma', '.aac', '.json' } | ForEach-Object {
     $name = 'sounds/' + $_.FullName.Substring((Join-Path $root 'sounds').Length + 1).Replace('\', '/')
     $rsp += "/resource:`"$($_.FullName)`",`"$name`""
 }

@@ -38,7 +38,8 @@ namespace ChargerDrama
                                     if (own != null && string.Equals(sub, own, StringComparison.OrdinalIgnoreCase)) continue;
                                     using (RegistryKey k = np.OpenSubKey(sub, false))
                                     {
-                                        if (InUse(k))
+                                        // an app that crashed mid-call leaves Stop = 0 forever: require it to be running
+                                        if (InUse(k) && IsRunning(sub))
                                         {
                                             appName = FriendlyNonPackaged(sub);
                                             return true;
@@ -76,6 +77,19 @@ namespace ChargerDrama
             long start = ToLong(k.GetValue("LastUsedTimeStart"));
             long stop = ToLong(k.GetValue("LastUsedTimeStop"));
             return start > 0 && stop == 0;
+        }
+
+        private static bool IsRunning(string nonPackagedKeyName)
+        {
+            try
+            {
+                string exe = Path.GetFileNameWithoutExtension(nonPackagedKeyName.Replace('#', '\\'));
+                Process[] ps = Process.GetProcessesByName(exe);
+                bool running = ps.Length > 0;
+                foreach (Process p in ps) p.Dispose();
+                return running;
+            }
+            catch (Exception) { return true; }
         }
 
         private static long ToLong(object v)

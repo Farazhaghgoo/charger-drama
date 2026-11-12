@@ -36,9 +36,9 @@ namespace ChargerDrama
             return new VoicePack { Name = VoiceLibrary.RobotName, IsRobot = true };
         }
 
-        public static VoicePack FromFolder(string folder, bool isUser)
+        public static VoicePack FromFolder(string folder, bool isUser, string displayName)
         {
-            var pack = new VoicePack { Name = Path.GetFileName(folder), Folder = folder, IsUser = isUser };
+            var pack = new VoicePack { Name = displayName, Folder = folder, IsUser = isUser };
             foreach (var f in Directory.GetFiles(folder))
             {
                 if (!AudioExtensions.Contains(Path.GetExtension(f).ToLowerInvariant())) continue;
@@ -136,10 +136,14 @@ namespace ChargerDrama
                 if (!Directory.Exists(root)) return;
                 foreach (var dir in Directory.GetDirectories(root).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
                 {
-                    var pack = VoicePack.FromFolder(dir, isUser);
-                    if (pack.IsEmpty) continue;
-                    if (packs.Any(p => string.Equals(p.Name, pack.Name, StringComparison.OrdinalIgnoreCase))) continue;
-                    packs.Add(pack);
+                    var name = Path.GetFileName(dir);
+                    if (packs.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) || string.Equals(name, RobotName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!isUser) continue;
+                        name += " (mine)";   // your recording named like a built-in voice
+                    }
+                    var pack = VoicePack.FromFolder(dir, isUser, name);
+                    if (!pack.IsEmpty) packs.Add(pack);
                 }
             }
             catch (Exception ex) { AppPaths.LogError("Load voices " + root, ex); }

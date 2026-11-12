@@ -179,6 +179,7 @@ namespace ChargerDrama
                 if (f.RedTint) using (var b = new SolidBrush(A(60, 255, 60, 40))) g.FillPath(b, body);
 
                 g.Clip = clip;
+                clip.Dispose();
 
                 using (var hl = RoundRect(new RectangleF(-29f, -106f, 7f, 60f), 3.5f))
                 using (var b = new SolidBrush(A(95, 255, 255, 255)))
@@ -255,6 +256,7 @@ namespace ChargerDrama
                     }
                 }
                 g.Clip = clip;
+                clip.Dispose();
             }
             using (var ink = new Pen(A(Ink), 2.2f))
                 g.DrawEllipse(ink, eye);
@@ -300,6 +302,7 @@ namespace ChargerDrama
                             using (var tongue = new SolidBrush(A(255, 110, 130)))
                                 g.FillEllipse(tongue, -8f, -64f + h - 7f, 16f, 10f);
                             g.Clip = clip;
+                            clip.Dispose();
                             g.DrawPath(ink, m);
                         }
                         break;
@@ -425,10 +428,18 @@ namespace ChargerDrama
         // ---- speech bubble --------------------------------------------------------------
         private static void DrawBubble(Graphics g, string text)
         {
-            using (var font = new Font("Segoe UI Semibold", 13f, FontStyle.Regular, GraphicsUnit.Pixel))
-            using (var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            var font = new Font("Segoe UI Semibold", 13f, FontStyle.Regular, GraphicsUnit.Pixel);
+            using (var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisWord })
+            try
             {
                 var size = g.MeasureString(text, font, 172, fmt);
+                if (size.Height > 76f)
+                {
+                    // long line: smaller text, a bit wider bubble (anything still too long ends in "...")
+                    font.Dispose();
+                    font = new Font("Segoe UI Semibold", 11f, FontStyle.Regular, GraphicsUnit.Pixel);
+                    size = g.MeasureString(text, font, 190, fmt);
+                }
                 float w = Math.Max(60f, size.Width + 24f), h = size.Height + 16f;
                 float right = AX - 20f, bottom = AY - 128f;
                 var rect = new RectangleF(right - w, Math.Max(4f, bottom - h), w, Math.Min(h, bottom - 4f));
@@ -450,6 +461,7 @@ namespace ChargerDrama
                 using (var tb = new SolidBrush(A(30, 30, 46)))
                     g.DrawString(text, font, tb, rect, fmt);
             }
+            finally { font.Dispose(); }
         }
 
         private static GraphicsPath BubblePath(RectangleF r, PointF tip)
@@ -709,22 +721,24 @@ namespace ChargerDrama
         private float level = 0.8f;
         private bool charging, muted, suppressed;
 
+        // times are seconds since start, as double so they stay precise after days of uptime
         private bool reacting;
         private Mood reactMood;
-        private float reactStart, reactEnd;
+        private double reactStart, reactEnd;
         private bool reactMuted;
 
         private string bubble;
-        private float bubbleEnd, bubbleAlpha;
+        private double bubbleEnd;
+        private float bubbleAlpha;
 
         private int power; // 0 none, 1 powering on, -1 powering off
-        private float powerStart;
+        private double powerStart;
         private float showAlpha;  // for "only when something happens" mode
 
-        private float nextBlink = 2f, blinkStart = -10f;
+        private double nextBlink = 2, blinkStart = -10;
         private float pupilX, pupilY;
         private int tickCount;
-        private float lastTopMost;
+        private double lastTopMost;
 
         private bool mouseDown, dragging;
         private Point downCursor, downPos;
@@ -747,7 +761,7 @@ namespace ChargerDrama
             win.Hide();
         }
 
-        private float Now { get { return (float)clock.Elapsed.TotalSeconds; } }
+        private double Now { get { return clock.Elapsed.TotalSeconds; } }
 
         public void SetContext(float level, bool charging, Mood baseMood, bool muted)
         {
@@ -759,7 +773,7 @@ namespace ChargerDrama
 
         public void React(Mood mood, string caption, bool silent)
         {
-            float now = Now;
+            double now = Now;
             reacting = true;
             reactMood = mood;
             reactStart = now;
@@ -796,7 +810,8 @@ namespace ChargerDrama
 
         private void TickCore()
         {
-            float now = Now;
+            double now = Now;
+            float t = (float)(now % 3600.0);   // animation phase
             tickCount++;
             bool talking = isTalking();
 
@@ -826,11 +841,17 @@ namespace ChargerDrama
                 return;
             }
             if (!win.Visible) { win.Show(); win.KeepOnTop(); }
-            if (now - lastTopMost > 3f) { win.KeepOnTop(); lastTopMost = now; }
+            if (now - lastTopMost > 3)
+            {
+                win.KeepOnTop();
+                lastTopMost = now;
+                // a monitor was unplugged or the resolution changed: come back
+                if (!dragging && !IsOnScreen(pos)) { pos = DefaultPosition(); win.MoveTo(pos); }
+            }
 
             // blinking and eyes following the mouse cursor
-            if (now >= nextBlink) { blinkStart = now; nextBlink = now + 2.2f + (float)rng.NextDouble() * 3.5f; }
-            float be = now - blinkStart;
+            if (now >= nextBlink) { blinkStart = now; nextBlink = now + 2.2 + rng.NextDouble() * 3.5; }
+            float be = (float)(now - blinkStart);
             float blink = be < 0.14f ? 1f - Math.Abs(be / 0.07f - 1f) : 0f;
             var cur = Cursor.Position;
             float ex = pos.X + MascotRenderer.AX * dpi, ey = pos.Y + (MascotRenderer.AY - 84f) * dpi;
@@ -845,8 +866,8 @@ namespace ChargerDrama
             if (!active && tickCount % 3 != 0) return;  // idle on battery: ~8 frames per second
 
             Mood mood = reacting ? reactMood : baseMood;
-            float moodE = reacting ? now - reactStart : now;
-            var f = MascotPoses.Build(mood, moodE, now, talking && !reactMuted, level, charging);
+            float moodE = reacting ? (float)(now - reactStart) : t;
+            var f = MascotPoses.Build(mood, moodE, t, talking && !reactMuted, level, charging);
             f.Blink = blink;
             f.PupilX = Clamp(f.PupilX * 0.6f + pupilX, -1f, 1f);
             f.PupilY = Clamp(f.PupilY * 0.6f + pupilY, -1f, 1f);
@@ -857,14 +878,14 @@ namespace ChargerDrama
 
             if (poweringOn)
             {
-                float pe = now - powerStart, p = Clamp(pe / 0.55f, 0f, 1f);
+                float pe = (float)(now - powerStart), p = Clamp(pe / 0.55f, 0f, 1f);
                 f.Scale = Math.Max(0.01f, MascotPoses.EaseOutBack(p));
                 if (pe < 0.45f) f.Eyes = EyeShape.Closed;
                 f.Sparkles = true;
             }
             else if (poweringOff)
             {
-                float pe = now - powerStart, p = Clamp(pe / 0.9f, 0f, 1f);
+                float pe = (float)(now - powerStart), p = Clamp(pe / 0.9f, 0f, 1f);
                 f.Eyes = EyeShape.Closed; f.Mouth = MouthShape.Flat; f.MouthOpen = 0f;
                 f.ArmL = f.ArmR = 0f; f.Sparkles = false; f.Exclaim = false;
                 f.Scale = Math.Max(0.01f, 1f - p * p * 0.9f);

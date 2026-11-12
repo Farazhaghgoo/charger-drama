@@ -63,6 +63,7 @@ namespace ChargerDrama
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden,
+                    WorkingDirectory = Path.GetTempPath(),   // rmdir can't remove its own working folder
                 };
                 Process.Start(psi);
             }
@@ -103,10 +104,19 @@ namespace ChargerDrama
                 Instance.WaitUntilStopped(4000);
             }
             var me = Process.GetCurrentProcess().Id;
+            // only the installed copy (it must not be running while we overwrite it); leave other copies alone
             foreach (var p in Process.GetProcessesByName("ChargerDrama"))
             {
-                if (p.Id == me) continue;
-                try { p.Kill(); p.WaitForExit(2000); } catch { }
+                try
+                {
+                    if (p.Id != me && string.Equals(p.MainModule.FileName, AppPaths.InstalledExe, StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Kill();
+                        p.WaitForExit(2000);
+                    }
+                }
+                catch { }
+                finally { p.Dispose(); }
             }
             Thread.Sleep(200);
         }
