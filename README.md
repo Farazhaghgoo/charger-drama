@@ -6,7 +6,7 @@ A tiny Windows app that gives your laptop feelings about its charger. Plug the c
 
 ## Install
 
-1. Build it (see [Build it yourself](#build-it-yourself)) or get `ChargerDrama.exe`.
+1. Download `ChargerDrama.exe` from the [latest release](https://github.com/Farazhaghgoo/charger-drama/releases/latest) (or [build it yourself](#build-it-yourself)).
 2. Double-click `ChargerDrama.exe` and choose **Yes** to install. (Choose **No** to just run it from where it is.)
 
 - No admin rights needed. It installs for your user only, in `%LOCALAPPDATA%\ChargerDrama`.
